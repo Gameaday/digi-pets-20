@@ -6,7 +6,7 @@ using namespace digipets;
 TEST(PetManagerTest, CreatePet) {
     PetManager manager;
     
-    std::string id = manager.create_pet("Agumon", PetSpecies::AGUMON);
+    std::string id = manager.create_pet("Agumon", PetSpecies::AGUMON, "");
     
     EXPECT_FALSE(id.empty());
     
@@ -18,8 +18,8 @@ TEST(PetManagerTest, CreatePet) {
 TEST(PetManagerTest, GetAllPets) {
     PetManager manager;
     
-    manager.create_pet("Agumon", PetSpecies::AGUMON);
-    manager.create_pet("Gabumon", PetSpecies::GABUMON);
+    manager.create_pet("Agumon", PetSpecies::AGUMON, "");
+    manager.create_pet("Gabumon", PetSpecies::GABUMON, "");
     
     auto pets = manager.get_all_pets();
     
@@ -29,7 +29,7 @@ TEST(PetManagerTest, GetAllPets) {
 TEST(PetManagerTest, DeletePet) {
     PetManager manager;
     
-    std::string id = manager.create_pet("Agumon", PetSpecies::AGUMON);
+    std::string id = manager.create_pet("Agumon", PetSpecies::AGUMON, "");
     
     EXPECT_TRUE(manager.delete_pet(id));
     
@@ -40,7 +40,7 @@ TEST(PetManagerTest, DeletePet) {
 TEST(PetManagerTest, FeedPet) {
     PetManager manager;
     
-    std::string id = manager.create_pet("Agumon", PetSpecies::AGUMON);
+    std::string id = manager.create_pet("Agumon", PetSpecies::AGUMON, "");
     
     EXPECT_TRUE(manager.feed_pet(id));
     
@@ -51,7 +51,7 @@ TEST(PetManagerTest, FeedPet) {
 TEST(PetManagerTest, TrainPet) {
     PetManager manager;
     
-    std::string id = manager.create_pet("Agumon", PetSpecies::AGUMON);
+    std::string id = manager.create_pet("Agumon", PetSpecies::AGUMON, "");
     
     auto before = manager.get_pet(id);
     ASSERT_TRUE(before.has_value());
@@ -67,7 +67,7 @@ TEST(PetManagerTest, TrainPet) {
 TEST(PetManagerTest, PlayWithPet) {
     PetManager manager;
     
-    std::string id = manager.create_pet("Agumon", PetSpecies::AGUMON);
+    std::string id = manager.create_pet("Agumon", PetSpecies::AGUMON, "");
     
     EXPECT_TRUE(manager.play_with_pet(id));
 }
@@ -75,7 +75,7 @@ TEST(PetManagerTest, PlayWithPet) {
 TEST(PetManagerTest, RestPet) {
     PetManager manager;
     
-    std::string id = manager.create_pet("Agumon", PetSpecies::AGUMON);
+    std::string id = manager.create_pet("Agumon", PetSpecies::AGUMON, "");
     
     EXPECT_TRUE(manager.rest_pet(id));
 }
@@ -83,8 +83,8 @@ TEST(PetManagerTest, RestPet) {
 TEST(PetManagerTest, UpdateAllPets) {
     PetManager manager;
     
-    manager.create_pet("Agumon", PetSpecies::AGUMON);
-    manager.create_pet("Gabumon", PetSpecies::GABUMON);
+    manager.create_pet("Agumon", PetSpecies::AGUMON, "");
+    manager.create_pet("Gabumon", PetSpecies::GABUMON, "");
     
     // Should not crash
     manager.update_all_pets();
@@ -98,8 +98,8 @@ TEST(PetManagerTest, Persistence) {
     
     {
         PetManager manager;
-        manager.create_pet("Agumon", PetSpecies::AGUMON);
-        manager.create_pet("Gabumon", PetSpecies::GABUMON);
+        manager.create_pet("Agumon", PetSpecies::AGUMON, "");
+        manager.create_pet("Gabumon", PetSpecies::GABUMON, "");
         
         EXPECT_TRUE(manager.save_to_file(test_file));
     }

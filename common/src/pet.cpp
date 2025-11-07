@@ -28,9 +28,10 @@ namespace {
     }
 }
 
-Pet::Pet(const std::string& name, PetSpecies species)
+Pet::Pet(const std::string& name, PetSpecies species, const std::string& owner_id)
     : id_(generate_uuid())
     , name_(name)
+    , owner_id_(owner_id)
     , species_(species)
     , stage_(PetStage::EGG)
     , birth_time_(std::chrono::system_clock::now())
@@ -181,6 +182,7 @@ nlohmann::json Pet::to_json() const {
     return {
         {"id", id_},
         {"name", name_},
+        {"owner_id", owner_id_},
         {"species", pet_species_to_string(species_)},
         {"stage", pet_stage_to_string(stage_)},
         {"stats", {
@@ -205,6 +207,12 @@ Pet Pet::from_json(const nlohmann::json& j) {
     Pet pet;
     pet.id_ = j.at("id").get<std::string>();
     pet.name_ = j.at("name").get<std::string>();
+    
+    // owner_id might not exist in old data
+    if (j.contains("owner_id")) {
+        pet.owner_id_ = j.at("owner_id").get<std::string>();
+    }
+    
     pet.species_ = pet_species_from_string(j.at("species").get<std::string>());
     pet.stage_ = pet_stage_from_string(j.at("stage").get<std::string>());
     

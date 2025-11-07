@@ -1,17 +1,20 @@
 # DigiPets - C++20 Digital Pets Game
 
-A server/client C++20 implementation of a digital pet game inspired by Digimon. Features a RESTful API server that can be containerized with Docker and a cross-platform client library.
+A server/client C++20 implementation of a digital pet game inspired by Digimon. Features a RESTful API server with **multi-user support** that can be containerized with Docker and a cross-platform client library.
 
 ## Features
 
 - **C++20 Implementation**: Modern C++ with concepts, ranges, and modules support
+- **Multi-User Support**: Each user has their own profile and pets with complete isolation
+- **User Authentication**: Secure registration and login system
 - **RESTful API**: Full CRUD operations for pet management
 - **Docker Support**: Server runs in a containerized environment
 - **Cross-Platform**: Client library works on Windows, Linux, macOS, and can be compiled for Android/Web
 - **Thread-Safe**: All operations are thread-safe with proper synchronization
-- **Persistent Storage**: Pets are saved to JSON files
+- **Persistent Storage**: Users and pets are saved to JSON files
 - **Real-Time Updates**: Pets age and their stats change over time
 - **Evolution System**: Pets evolve through multiple stages based on level and age
+- **Ownership Protection**: Users can only access and manage their own pets
 
 ## Architecture
 
@@ -142,67 +145,71 @@ docker-compose down
 
 ## API Reference
 
+For complete multi-user API documentation, see [Multi-User API Documentation](docs/MULTIUSER_API.md).
+
+### Quick Start
+
+#### 1. Register a User
+```bash
+curl -X POST http://localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"alice","password":"password123"}'
+```
+
+#### 2. Login
+```bash
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"alice","password":"password123"}'
+```
+
+#### 3. Create a Pet (requires authentication)
+```bash
+curl -X POST http://localhost:8080/api/pets \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-token>" \
+  -d '{"name":"Agumon","species":"agumon"}'
+```
+
 ### Base URL
 ```
 http://localhost:8080
 ```
 
-### Endpoints
+### Authentication
+
+All pet-related endpoints require authentication. Include the token in the Authorization header:
+
+```
+Authorization: Bearer <token>
+```
+
+### Main Endpoints
+
+#### Authentication
+- `POST /api/auth/register` - Register a new user
+- `POST /api/auth/login` - Login and get token
 
 #### Health Check
 ```http
 GET /health
 ```
 
-#### List All Pets
+#### Pet Management (all require authentication)
 ```http
 GET /api/pets
-```
-
-#### Get Pet by ID
-```http
 GET /api/pets/{id}
-```
-
-#### Create New Pet
-```http
 POST /api/pets
-Content-Type: application/json
-
-{
-  "name": "Agumon",
-  "species": "agumon"  // agumon, gabumon, patamon, tailmon
-}
-```
-
-#### Delete Pet
-```http
 DELETE /api/pets/{id}
-```
-
-#### Feed Pet
-```http
 POST /api/pets/{id}/feed
-```
-
-#### Train Pet
-```http
 POST /api/pets/{id}/train
-```
-
-#### Play with Pet
-```http
 POST /api/pets/{id}/play
-```
-
-#### Rest Pet
-```http
 POST /api/pets/{id}/rest
 ```
 
 ### Response Format
 
-All successful responses return JSON with pet data:
+All successful responses return JSON. Pet data now includes owner_id:
 
 ```json
 {

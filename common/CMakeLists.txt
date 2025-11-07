@@ -17,6 +17,7 @@ endif()
 # Common library
 add_library(digipets_common STATIC
     src/pet.cpp
+    src/user.cpp
 )
 
 target_include_directories(digipets_common

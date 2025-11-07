@@ -47,18 +47,22 @@ struct PetStats {
 
 class Pet {
 public:
-    Pet(const std::string& name, PetSpecies species);
+    Pet(const std::string& name, PetSpecies species, const std::string& owner_id = "");
     Pet() = default;
 
     // Getters
     const std::string& get_id() const { return id_; }
     const std::string& get_name() const { return name_; }
+    const std::string& get_owner_id() const { return owner_id_; }
     PetSpecies get_species() const { return species_; }
     PetStage get_stage() const { return stage_; }
     const PetStats& get_stats() const { return stats_; }
     bool is_alive() const { return stats_.health > 0; }
     std::chrono::system_clock::time_point get_birth_time() const { return birth_time_; }
     std::chrono::system_clock::time_point get_last_update() const { return last_update_; }
+
+    // Setters
+    void set_owner_id(const std::string& owner_id) { owner_id_ = owner_id; }
 
     // Actions
     void feed();
@@ -77,6 +81,7 @@ public:
 private:
     std::string id_;
     std::string name_;
+    std::string owner_id_;
     PetSpecies species_;
     PetStage stage_ = PetStage::EGG;
     PetStats stats_;

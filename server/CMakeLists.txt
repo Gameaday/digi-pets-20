@@ -17,6 +17,7 @@ endif()
 add_executable(digipets_server
     src/main.cpp
     src/pet_manager.cpp
+    src/user_manager.cpp
 )
 
 target_include_directories(digipets_server

@@ -1,4 +1,5 @@
 #include "pet_manager.hpp"
+#include "user_manager.hpp"
 #include <httplib.h>
 #include <iostream>
 #include <thread>
@@ -14,19 +15,47 @@ void signal_handler(int signal) {
     running = false;
 }
 
+// Helper function to extract user_id from Authorization header
+std::optional<std::string> get_user_from_auth(const httplib::Request& req, UserManager& user_mgr) {
+    auto auth_header = req.get_header_value("Authorization");
+    
+    if (auth_header.empty()) {
+        return std::nullopt;
+    }
+    
+    // Simple token-based auth: "Bearer <user_id>"
+    if (auth_header.find("Bearer ") == 0) {
+        std::string user_id = auth_header.substr(7);
+        
+        // Verify user exists
+        auto user_opt = user_mgr.get_user(user_id);
+        if (user_opt) {
+            return user_id;
+        }
+    }
+    
+    return std::nullopt;
+}
+
 int main(int argc, char* argv[]) {
     // Setup signal handlers
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
 
-    const std::string save_file = "pets.json";
+    const std::string pets_file = "pets.json";
+    const std::string users_file = "users.json";
     const int port = (argc > 1) ? std::stoi(argv[1]) : 8080;
 
-    PetManager manager;
+    PetManager pet_mgr;
+    UserManager user_mgr;
     
-    // Try to load existing pets
-    if (manager.load_from_file(save_file)) {
-        std::cout << "Loaded existing pets from " << save_file << std::endl;
+    // Try to load existing data
+    if (pet_mgr.load_from_file(pets_file)) {
+        std::cout << "Loaded existing pets from " << pets_file << std::endl;
+    }
+    
+    if (user_mgr.load_from_file(users_file)) {
+        std::cout << "Loaded existing users from " << users_file << std::endl;
     }
 
     httplib::Server server;
@@ -35,7 +64,7 @@ int main(int argc, char* argv[]) {
     server.set_default_headers({
         {"Access-Control-Allow-Origin", "*"},
         {"Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS"},
-        {"Access-Control-Allow-Headers", "Content-Type"}
+        {"Access-Control-Allow-Headers", "Content-Type, Authorization"}
     });
 
     // Health check
@@ -43,9 +72,85 @@ int main(int argc, char* argv[]) {
         res.set_content(R"({"status":"ok"})", "application/json");
     });
 
-    // List all pets
-    server.Get("/api/pets", [&manager](const httplib::Request&, httplib::Response& res) {
-        auto pets = manager.get_all_pets();
+    // User registration
+    server.Post("/api/auth/register", [&user_mgr, &users_file](const httplib::Request& req, httplib::Response& res) {
+        try {
+            auto j = nlohmann::json::parse(req.body);
+            
+            std::string username = j.at("username").get<std::string>();
+            std::string password = j.at("password").get<std::string>();
+            
+            auto user_id_opt = user_mgr.register_user(username, password);
+            
+            if (user_id_opt) {
+                user_mgr.save_to_file(users_file);
+                
+                res.status = 201;
+                res.set_content(
+                    nlohmann::json{
+                        {"user_id", *user_id_opt},
+                        {"username", username},
+                        {"message", "User registered successfully"}
+                    }.dump(),
+                    "application/json"
+                );
+            } else {
+                res.status = 409;
+                res.set_content(R"({"error":"Username already exists"})", "application/json");
+            }
+        } catch (const std::exception& e) {
+            res.status = 400;
+            res.set_content(
+                nlohmann::json{{"error", std::string("Invalid request: ") + e.what()}}.dump(),
+                "application/json"
+            );
+        }
+    });
+
+    // User login
+    server.Post("/api/auth/login", [&user_mgr](const httplib::Request& req, httplib::Response& res) {
+        try {
+            auto j = nlohmann::json::parse(req.body);
+            
+            std::string username = j.at("username").get<std::string>();
+            std::string password = j.at("password").get<std::string>();
+            
+            auto user_id_opt = user_mgr.authenticate(username, password);
+            
+            if (user_id_opt) {
+                res.set_content(
+                    nlohmann::json{
+                        {"user_id", *user_id_opt},
+                        {"username", username},
+                        {"token", *user_id_opt},  // Simple token = user_id
+                        {"message", "Login successful"}
+                    }.dump(),
+                    "application/json"
+                );
+            } else {
+                res.status = 401;
+                res.set_content(R"({"error":"Invalid credentials"})", "application/json");
+            }
+        } catch (const std::exception& e) {
+            res.status = 400;
+            res.set_content(
+                nlohmann::json{{"error", std::string("Invalid request: ") + e.what()}}.dump(),
+                "application/json"
+            );
+        }
+    });
+
+    // List all pets (user-filtered)
+    server.Get("/api/pets", [&pet_mgr, &user_mgr](const httplib::Request& req, httplib::Response& res) {
+        auto user_id_opt = get_user_from_auth(req, user_mgr);
+        
+        if (!user_id_opt) {
+            res.status = 401;
+            res.set_content(R"({"error":"Unauthorized"})", "application/json");
+            return;
+        }
+        
+        auto pets = pet_mgr.get_all_pets(*user_id_opt);
         nlohmann::json j = nlohmann::json::array();
         
         for (const auto& pet : pets) {
@@ -56,20 +161,36 @@ int main(int argc, char* argv[]) {
     });
 
     // Get specific pet
-    server.Get(R"(/api/pets/(\w+-\w+-\w+-\w+-\w+))", [&manager](const httplib::Request& req, httplib::Response& res) {
+    server.Get(R"(/api/pets/(\w+-\w+-\w+-\w+-\w+))", [&pet_mgr, &user_mgr](const httplib::Request& req, httplib::Response& res) {
+        auto user_id_opt = get_user_from_auth(req, user_mgr);
+        
+        if (!user_id_opt) {
+            res.status = 401;
+            res.set_content(R"({"error":"Unauthorized"})", "application/json");
+            return;
+        }
+        
         std::string id = req.matches[1];
-        auto pet_opt = manager.get_pet(id);
+        auto pet_opt = pet_mgr.get_pet(id, *user_id_opt);
         
         if (pet_opt) {
             res.set_content(pet_opt->to_json().dump(), "application/json");
         } else {
             res.status = 404;
-            res.set_content(R"({"error":"Pet not found"})", "application/json");
+            res.set_content(R"({"error":"Pet not found or access denied"})", "application/json");
         }
     });
 
     // Create new pet
-    server.Post("/api/pets", [&manager, &save_file](const httplib::Request& req, httplib::Response& res) {
+    server.Post("/api/pets", [&pet_mgr, &user_mgr, &pets_file](const httplib::Request& req, httplib::Response& res) {
+        auto user_id_opt = get_user_from_auth(req, user_mgr);
+        
+        if (!user_id_opt) {
+            res.status = 401;
+            res.set_content(R"({"error":"Unauthorized"})", "application/json");
+            return;
+        }
+        
         try {
             auto j = nlohmann::json::parse(req.body);
             
@@ -77,11 +198,11 @@ int main(int argc, char* argv[]) {
             std::string species_str = j.at("species").get<std::string>();
             
             PetSpecies species = pet_species_from_string(species_str);
-            std::string id = manager.create_pet(name, species);
+            std::string id = pet_mgr.create_pet(name, species, *user_id_opt);
             
-            auto pet_opt = manager.get_pet(id);
+            auto pet_opt = pet_mgr.get_pet(id, *user_id_opt);
             if (pet_opt) {
-                manager.save_to_file(save_file);
+                pet_mgr.save_to_file(pets_file);
                 res.status = 201;
                 res.set_content(pet_opt->to_json().dump(), "application/json");
             }
@@ -95,93 +216,135 @@ int main(int argc, char* argv[]) {
     });
 
     // Delete pet
-    server.Delete(R"(/api/pets/(\w+-\w+-\w+-\w+-\w+))", [&manager, &save_file](const httplib::Request& req, httplib::Response& res) {
+    server.Delete(R"(/api/pets/(\w+-\w+-\w+-\w+-\w+))", [&pet_mgr, &user_mgr, &pets_file](const httplib::Request& req, httplib::Response& res) {
+        auto user_id_opt = get_user_from_auth(req, user_mgr);
+        
+        if (!user_id_opt) {
+            res.status = 401;
+            res.set_content(R"({"error":"Unauthorized"})", "application/json");
+            return;
+        }
+        
         std::string id = req.matches[1];
         
-        if (manager.delete_pet(id)) {
-            manager.save_to_file(save_file);
+        if (pet_mgr.delete_pet(id, *user_id_opt)) {
+            pet_mgr.save_to_file(pets_file);
             res.set_content(R"({"success":true})", "application/json");
         } else {
             res.status = 404;
-            res.set_content(R"({"error":"Pet not found"})", "application/json");
+            res.set_content(R"({"error":"Pet not found or access denied"})", "application/json");
         }
     });
 
-    // Pet actions
-    server.Post(R"(/api/pets/(\w+-\w+-\w+-\w+-\w+)/feed)", [&manager, &save_file](const httplib::Request& req, httplib::Response& res) {
+    // Pet actions with authentication
+    server.Post(R"(/api/pets/(\w+-\w+-\w+-\w+-\w+)/feed)", [&pet_mgr, &user_mgr, &pets_file](const httplib::Request& req, httplib::Response& res) {
+        auto user_id_opt = get_user_from_auth(req, user_mgr);
+        
+        if (!user_id_opt) {
+            res.status = 401;
+            res.set_content(R"({"error":"Unauthorized"})", "application/json");
+            return;
+        }
+        
         std::string id = req.matches[1];
         
-        if (manager.feed_pet(id)) {
-            auto pet_opt = manager.get_pet(id);
-            manager.save_to_file(save_file);
+        if (pet_mgr.feed_pet(id, *user_id_opt)) {
+            auto pet_opt = pet_mgr.get_pet(id, *user_id_opt);
+            pet_mgr.save_to_file(pets_file);
             res.set_content(pet_opt->to_json().dump(), "application/json");
         } else {
             res.status = 404;
-            res.set_content(R"({"error":"Pet not found"})", "application/json");
+            res.set_content(R"({"error":"Pet not found or access denied"})", "application/json");
         }
     });
 
-    server.Post(R"(/api/pets/(\w+-\w+-\w+-\w+-\w+)/train)", [&manager, &save_file](const httplib::Request& req, httplib::Response& res) {
+    server.Post(R"(/api/pets/(\w+-\w+-\w+-\w+-\w+)/train)", [&pet_mgr, &user_mgr, &pets_file](const httplib::Request& req, httplib::Response& res) {
+        auto user_id_opt = get_user_from_auth(req, user_mgr);
+        
+        if (!user_id_opt) {
+            res.status = 401;
+            res.set_content(R"({"error":"Unauthorized"})", "application/json");
+            return;
+        }
+        
         std::string id = req.matches[1];
         
-        if (manager.train_pet(id)) {
-            auto pet_opt = manager.get_pet(id);
-            manager.save_to_file(save_file);
+        if (pet_mgr.train_pet(id, *user_id_opt)) {
+            auto pet_opt = pet_mgr.get_pet(id, *user_id_opt);
+            pet_mgr.save_to_file(pets_file);
             res.set_content(pet_opt->to_json().dump(), "application/json");
         } else {
             res.status = 404;
-            res.set_content(R"({"error":"Pet not found"})", "application/json");
+            res.set_content(R"({"error":"Pet not found or access denied"})", "application/json");
         }
     });
 
-    server.Post(R"(/api/pets/(\w+-\w+-\w+-\w+-\w+)/play)", [&manager, &save_file](const httplib::Request& req, httplib::Response& res) {
+    server.Post(R"(/api/pets/(\w+-\w+-\w+-\w+-\w+)/play)", [&pet_mgr, &user_mgr, &pets_file](const httplib::Request& req, httplib::Response& res) {
+        auto user_id_opt = get_user_from_auth(req, user_mgr);
+        
+        if (!user_id_opt) {
+            res.status = 401;
+            res.set_content(R"({"error":"Unauthorized"})", "application/json");
+            return;
+        }
+        
         std::string id = req.matches[1];
         
-        if (manager.play_with_pet(id)) {
-            auto pet_opt = manager.get_pet(id);
-            manager.save_to_file(save_file);
+        if (pet_mgr.play_with_pet(id, *user_id_opt)) {
+            auto pet_opt = pet_mgr.get_pet(id, *user_id_opt);
+            pet_mgr.save_to_file(pets_file);
             res.set_content(pet_opt->to_json().dump(), "application/json");
         } else {
             res.status = 404;
-            res.set_content(R"({"error":"Pet not found"})", "application/json");
+            res.set_content(R"({"error":"Pet not found or access denied"})", "application/json");
         }
     });
 
-    server.Post(R"(/api/pets/(\w+-\w+-\w+-\w+-\w+)/rest)", [&manager, &save_file](const httplib::Request& req, httplib::Response& res) {
+    server.Post(R"(/api/pets/(\w+-\w+-\w+-\w+-\w+)/rest)", [&pet_mgr, &user_mgr, &pets_file](const httplib::Request& req, httplib::Response& res) {
+        auto user_id_opt = get_user_from_auth(req, user_mgr);
+        
+        if (!user_id_opt) {
+            res.status = 401;
+            res.set_content(R"({"error":"Unauthorized"})", "application/json");
+            return;
+        }
+        
         std::string id = req.matches[1];
         
-        if (manager.rest_pet(id)) {
-            auto pet_opt = manager.get_pet(id);
-            manager.save_to_file(save_file);
+        if (pet_mgr.rest_pet(id, *user_id_opt)) {
+            auto pet_opt = pet_mgr.get_pet(id, *user_id_opt);
+            pet_mgr.save_to_file(pets_file);
             res.set_content(pet_opt->to_json().dump(), "application/json");
         } else {
             res.status = 404;
-            res.set_content(R"({"error":"Pet not found"})", "application/json");
+            res.set_content(R"({"error":"Pet not found or access denied"})", "application/json");
         }
     });
 
     // Background thread to periodically update all pets
-    std::thread update_thread([&manager, &save_file]() {
+    std::thread update_thread([&pet_mgr, &pets_file]() {
         while (running) {
             std::this_thread::sleep_for(std::chrono::minutes(5));
             if (running) {
-                manager.update_all_pets();
-                manager.save_to_file(save_file);
+                pet_mgr.update_all_pets();
+                pet_mgr.save_to_file(pets_file);
             }
         }
     });
 
-    std::cout << "Starting DigiPets server on port " << port << "..." << std::endl;
+    std::cout << "Starting DigiPets Multi-User server on port " << port << "..." << std::endl;
     std::cout << "API endpoints:" << std::endl;
     std::cout << "  GET    /health" << std::endl;
-    std::cout << "  GET    /api/pets" << std::endl;
-    std::cout << "  GET    /api/pets/{id}" << std::endl;
-    std::cout << "  POST   /api/pets" << std::endl;
-    std::cout << "  DELETE /api/pets/{id}" << std::endl;
-    std::cout << "  POST   /api/pets/{id}/feed" << std::endl;
-    std::cout << "  POST   /api/pets/{id}/train" << std::endl;
-    std::cout << "  POST   /api/pets/{id}/play" << std::endl;
-    std::cout << "  POST   /api/pets/{id}/rest" << std::endl;
+    std::cout << "  POST   /api/auth/register" << std::endl;
+    std::cout << "  POST   /api/auth/login" << std::endl;
+    std::cout << "  GET    /api/pets (requires auth)" << std::endl;
+    std::cout << "  GET    /api/pets/{id} (requires auth)" << std::endl;
+    std::cout << "  POST   /api/pets (requires auth)" << std::endl;
+    std::cout << "  DELETE /api/pets/{id} (requires auth)" << std::endl;
+    std::cout << "  POST   /api/pets/{id}/feed (requires auth)" << std::endl;
+    std::cout << "  POST   /api/pets/{id}/train (requires auth)" << std::endl;
+    std::cout << "  POST   /api/pets/{id}/play (requires auth)" << std::endl;
+    std::cout << "  POST   /api/pets/{id}/rest (requires auth)" << std::endl;
 
     // Start server in a separate thread
     std::thread server_thread([&server, port]() {
@@ -206,8 +369,9 @@ int main(int argc, char* argv[]) {
     }
 
     // Final save
-    manager.save_to_file(save_file);
-    std::cout << "Server stopped. Pets saved." << std::endl;
+    pet_mgr.save_to_file(pets_file);
+    user_mgr.save_to_file(users_file);
+    std::cout << "Server stopped. Data saved." << std::endl;
 
     return 0;
 }

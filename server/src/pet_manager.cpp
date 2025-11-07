@@ -4,21 +4,35 @@
 
 namespace digipets {
 
-std::string PetManager::create_pet(const std::string& name, PetSpecies species) {
+bool PetManager::check_ownership(const std::string& pet_id, const std::string& owner_id) {
+    // If owner_id is empty, allow access (backward compatibility or admin)
+    if (owner_id.empty()) {
+        return true;
+    }
+    
+    auto it = pets_.find(pet_id);
+    if (it == pets_.end()) {
+        return false;
+    }
+    
+    return it->second.get_owner_id() == owner_id;
+}
+
+std::string PetManager::create_pet(const std::string& name, PetSpecies species, const std::string& owner_id) {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    Pet pet(name, species);
+    Pet pet(name, species, owner_id);
     std::string id = pet.get_id();
     pets_[id] = pet;
     
     return id;
 }
 
-std::optional<Pet> PetManager::get_pet(const std::string& id) {
+std::optional<Pet> PetManager::get_pet(const std::string& id, const std::string& owner_id) {
     std::lock_guard<std::mutex> lock(mutex_);
     
     auto it = pets_.find(id);
-    if (it != pets_.end()) {
+    if (it != pets_.end() && check_ownership(id, owner_id)) {
         // Update pet before returning
         auto now = std::chrono::system_clock::now();
         it->second.update(now);
@@ -27,13 +41,18 @@ std::optional<Pet> PetManager::get_pet(const std::string& id) {
     return std::nullopt;
 }
 
-std::vector<Pet> PetManager::get_all_pets() {
+std::vector<Pet> PetManager::get_all_pets(const std::string& owner_id) {
     std::lock_guard<std::mutex> lock(mutex_);
     
     std::vector<Pet> result;
     auto now = std::chrono::system_clock::now();
     
     for (auto& [id, pet] : pets_) {
+        // If owner_id is provided, filter by ownership
+        if (!owner_id.empty() && pet.get_owner_id() != owner_id) {
+            continue;
+        }
+        
         pet.update(now);
         result.push_back(pet);
     }
@@ -52,14 +71,22 @@ bool PetManager::update_pet(const Pet& pet) {
     return false;
 }
 
-bool PetManager::delete_pet(const std::string& id) {
+bool PetManager::delete_pet(const std::string& id, const std::string& owner_id) {
     std::lock_guard<std::mutex> lock(mutex_);
+    
+    if (!check_ownership(id, owner_id)) {
+        return false;
+    }
     
     return pets_.erase(id) > 0;
 }
 
-bool PetManager::feed_pet(const std::string& id) {
+bool PetManager::feed_pet(const std::string& id, const std::string& owner_id) {
     std::lock_guard<std::mutex> lock(mutex_);
+    
+    if (!check_ownership(id, owner_id)) {
+        return false;
+    }
     
     auto it = pets_.find(id);
     if (it != pets_.end()) {
@@ -71,8 +98,12 @@ bool PetManager::feed_pet(const std::string& id) {
     return false;
 }
 
-bool PetManager::train_pet(const std::string& id) {
+bool PetManager::train_pet(const std::string& id, const std::string& owner_id) {
     std::lock_guard<std::mutex> lock(mutex_);
+    
+    if (!check_ownership(id, owner_id)) {
+        return false;
+    }
     
     auto it = pets_.find(id);
     if (it != pets_.end()) {
@@ -84,8 +115,12 @@ bool PetManager::train_pet(const std::string& id) {
     return false;
 }
 
-bool PetManager::play_with_pet(const std::string& id) {
+bool PetManager::play_with_pet(const std::string& id, const std::string& owner_id) {
     std::lock_guard<std::mutex> lock(mutex_);
+    
+    if (!check_ownership(id, owner_id)) {
+        return false;
+    }
     
     auto it = pets_.find(id);
     if (it != pets_.end()) {
@@ -97,8 +132,12 @@ bool PetManager::play_with_pet(const std::string& id) {
     return false;
 }
 
-bool PetManager::rest_pet(const std::string& id) {
+bool PetManager::rest_pet(const std::string& id, const std::string& owner_id) {
     std::lock_guard<std::mutex> lock(mutex_);
+    
+    if (!check_ownership(id, owner_id)) {
+        return false;
+    }
     
     auto it = pets_.find(id);
     if (it != pets_.end()) {
