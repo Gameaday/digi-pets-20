@@ -349,11 +349,31 @@ The project uses modern C++20 features:
 
 ## Security
 
+### Current Implementation
+- User authentication with password hashing
+- Bearer token-based authorization
+- Complete user isolation (users can only access their own pets)
+- Ownership verification on all pet operations
 - Input validation on all API endpoints
 - Thread-safe operations with mutex protection
 - No SQL injection vulnerabilities (uses JSON file storage)
 - CORS headers for web client support
 - Graceful shutdown handling
+
+### ⚠️ Production Security Notes
+**Important:** This implementation uses simplified authentication suitable for development/demo purposes.
+
+For production deployment, you should:
+- Replace simple password hashing with bcrypt or argon2
+- Implement proper JWT tokens with expiration and refresh mechanism
+- Add HTTPS/TLS encryption for all communications
+- Implement rate limiting on authentication endpoints
+- Add account lockout after failed login attempts
+- Consider adding email verification for registration
+- Use environment variables for sensitive configuration
+- Implement proper session management
+
+See [Multi-User API Documentation](docs/MULTIUSER_API.md) for details.
 
 ## Performance
 
@@ -365,8 +385,9 @@ The project uses modern C++20 features:
 
 ## Roadmap
 
+- [x] Multi-user authentication and authorization ✅
+- [ ] Enhanced security (JWT tokens, bcrypt, rate limiting)
 - [ ] WebSocket support for real-time updates
-- [ ] User authentication and authorization
 - [ ] Multiplayer battles between pets
 - [ ] Database backend (PostgreSQL/SQLite)
 - [ ] Mobile apps (Android/iOS)

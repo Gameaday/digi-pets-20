@@ -42,12 +42,20 @@ echo "3. Registering user 'bob'..."
 USER2_RESPONSE=$(curl -s -X POST "$SERVER_URL/api/auth/register" \
   -H "Content-Type: application/json" \
   -d '{"username":"bob","password":"bob456"}')
-USER2_TOKEN=$(echo "$USER2_RESPONSE" | jq -r '.user_id')
 echo "$USER2_RESPONSE" | jq .
 echo ""
 
+# Login User 2
+echo "4. Logging in as 'bob'..."
+USER2_LOGIN=$(curl -s -X POST "$SERVER_URL/api/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"bob","password":"bob456"}')
+USER2_TOKEN=$(echo "$USER2_LOGIN" | jq -r '.token')
+echo "$USER2_LOGIN" | jq .
+echo ""
+
 # Alice creates a pet
-echo "4. Alice creates an Agumon named 'FireDragon'..."
+echo "5. Alice creates an Agumon named 'FireDragon'..."
 ALICE_PET=$(curl -s -X POST "$SERVER_URL/api/pets" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $USER1_TOKEN" \
@@ -57,7 +65,7 @@ echo "$ALICE_PET" | jq '{id, name, owner_id, species, stage}'
 echo ""
 
 # Bob creates a pet
-echo "5. Bob creates a Gabumon named 'IceWolf'..."
+echo "6. Bob creates a Gabumon named 'IceWolf'..."
 BOB_PET=$(curl -s -X POST "$SERVER_URL/api/pets" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $USER2_TOKEN" \
@@ -67,31 +75,31 @@ echo "$BOB_PET" | jq '{id, name, owner_id, species, stage}'
 echo ""
 
 # Alice feeds her pet
-echo "6. Alice feeds FireDragon..."
+echo "7. Alice feeds FireDragon..."
 curl -s -X POST "$SERVER_URL/api/pets/$ALICE_PET_ID/feed" \
   -H "Authorization: Bearer $USER1_TOKEN" | jq '{name, stats: {hunger, happiness, experience}}'
 echo ""
 
 # Bob trains his pet
-echo "7. Bob trains IceWolf..."
+echo "8. Bob trains IceWolf..."
 curl -s -X POST "$SERVER_URL/api/pets/$BOB_PET_ID/train" \
   -H "Authorization: Bearer $USER2_TOKEN" | jq '{name, stats: {strength, intelligence, experience}}'
 echo ""
 
 # Alice lists her pets (should only see her own)
-echo "8. Alice lists her pets (should only see FireDragon)..."
+echo "9. Alice lists her pets (should only see FireDragon)..."
 curl -s "$SERVER_URL/api/pets" \
   -H "Authorization: Bearer $USER1_TOKEN" | jq '[.[] | {name, species, owner_id}]'
 echo ""
 
 # Bob lists his pets (should only see his own)
-echo "9. Bob lists his pets (should only see IceWolf)..."
+echo "10. Bob lists his pets (should only see IceWolf)..."
 curl -s "$SERVER_URL/api/pets" \
   -H "Authorization: Bearer $USER2_TOKEN" | jq '[.[] | {name, species, owner_id}]'
 echo ""
 
 # Try to access Bob's pet as Alice (should fail)
-echo "10. Alice tries to access Bob's pet (should fail)..."
+echo "11. Alice tries to access Bob's pet (should fail)..."
 ALICE_ACCESS_BOB=$(curl -s "$SERVER_URL/api/pets/$BOB_PET_ID" \
   -H "Authorization: Bearer $USER1_TOKEN")
 echo "$ALICE_ACCESS_BOB" | jq .

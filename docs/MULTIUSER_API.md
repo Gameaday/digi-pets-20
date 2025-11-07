@@ -296,9 +296,18 @@ curl http://localhost:8080/api/pets \
 ## Security Notes
 
 - Passwords are hashed before storage (using simple hash for demo; use bcrypt/argon2 in production)
-- Tokens are currently user_id (simple for demo; use JWT or session tokens in production)
+- Tokens are currently user_id (simple for demo; **use JWT or session tokens in production**)
 - Each user can only access their own pets
 - All pet operations verify ownership before proceeding
+
+**⚠️ Production Security Recommendations:**
+- Replace simple password hashing with bcrypt, argon2, or similar
+- Implement proper JWT tokens with expiration times
+- Add rate limiting for authentication endpoints
+- Use HTTPS/TLS for all communications
+- Add refresh token mechanism
+- Implement account lockout after failed login attempts
+- Consider adding email verification for registration
 
 ---
 
