@@ -1,5 +1,0 @@
-if(EXISTS "/home/runner/work/digi-pets-20/digi-pets-20/_codeql_build_dir/tests/digipets_tests[1]_tests.cmake")
-  include("/home/runner/work/digi-pets-20/digi-pets-20/_codeql_build_dir/tests/digipets_tests[1]_tests.cmake")
-else()
-  add_test(digipets_tests_NOT_BUILT digipets_tests_NOT_BUILT)
-endif()
