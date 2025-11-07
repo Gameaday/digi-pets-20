@@ -94,7 +94,7 @@ TEST(PetManagerTest, UpdateAllPets) {
 }
 
 TEST(PetManagerTest, Persistence) {
-    const std::string test_file = "/tmp/test_pets.json";
+    const std::string test_file = "test_pets.json";
     
     {
         PetManager manager;

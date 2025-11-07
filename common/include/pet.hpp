@@ -3,6 +3,7 @@
 #include <string>
 #include <chrono>
 #include <optional>
+#include <algorithm>
 #include <nlohmann/json.hpp>
 
 namespace digipets {
