@@ -13,17 +13,18 @@ FetchContent_MakeAvailable(googletest)
 
 enable_testing()
 
-# Create a library from pet_manager for testing
-add_library(pet_manager_lib STATIC
+# Compile server-side sources for tests (without main)
+add_library(server_test_lib STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../server/src/pet_manager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../server/src/user_manager.cpp
 )
 
-target_include_directories(pet_manager_lib
+target_include_directories(server_test_lib
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/../server/include
 )
 
-target_link_libraries(pet_manager_lib
+target_link_libraries(server_test_lib
     PUBLIC
         digipets_common
 )
@@ -32,13 +33,14 @@ target_link_libraries(pet_manager_lib
 add_executable(digipets_tests
     test_pet.cpp
     test_pet_manager.cpp
+    test_user.cpp
 )
 
 target_link_libraries(digipets_tests
     PRIVATE
         digipets_common
         digipets_client
-        pet_manager_lib
+        server_test_lib
         GTest::gtest_main
 )
 

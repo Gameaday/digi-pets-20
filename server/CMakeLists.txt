@@ -8,10 +8,13 @@ if(NOT httplib_FOUND)
     FetchContent_Declare(
         cpp-httplib
         GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
-        GIT_TAG v0.14.3
+        GIT_TAG v0.18.3
     )
     FetchContent_MakeAvailable(cpp-httplib)
 endif()
+
+# OpenSSL (already pulled in via digipets_common, but also needed for httplib TLS)
+find_package(OpenSSL REQUIRED)
 
 # Server executable
 add_executable(digipets_server
@@ -29,6 +32,7 @@ target_link_libraries(digipets_server
     PRIVATE
         digipets_common
         httplib::httplib
+        OpenSSL::Crypto
 )
 
 target_compile_features(digipets_server PRIVATE cxx_std_20)

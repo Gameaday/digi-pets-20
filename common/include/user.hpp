@@ -27,11 +27,17 @@ public:
 private:
     std::string id_;
     std::string username_;
-    std::string password_hash_;
+    std::string salt_;           // Random hex-encoded salt per user
+    std::string password_hash_;  // SHA-256(salt + password)
     std::chrono::system_clock::time_point created_at_;
 
-    std::string generate_id();
+    static std::string generate_uuid();
+    static std::string generate_salt();
     std::string hash_password(const std::string& password) const;
 };
+
+// Input validation helpers
+bool is_valid_username(const std::string& username);
+bool is_valid_password(const std::string& password);
 
 } // namespace digipets

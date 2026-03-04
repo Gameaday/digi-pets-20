@@ -2,7 +2,7 @@
 
 ## Overview
 
-The DigiPets API now supports multiple users with authentication. Each user has their own profile and pets that are isolated from other users.
+The DigiPets API supports multiple users with full authentication and session management. Each user has their own profile and pets that are completely isolated from other users.
 
 ## Base URL
 
@@ -12,11 +12,25 @@ http://localhost:8080
 
 ## Authentication
 
-All pet-related endpoints require authentication using a Bearer token in the Authorization header.
+All pet-related endpoints require authentication using a **Bearer session token** in the `Authorization` header.
+
+Session tokens:
+- Are 64-character cryptographically random hex strings
+- Expire after **24 hours**
+- Are invalidated immediately on logout
+- Can be refreshed by logging in again
+
+### Input Validation
+
+| Field    | Constraints                                          |
+|----------|------------------------------------------------------|
+| username | 3–32 characters, letters/digits/underscores only     |
+| password | 8–128 characters (any characters)                   |
+| pet name | 1–64 characters                                     |
+
+---
 
 ### Register a New User
-
-Create a new user account.
 
 ```http
 POST /api/auth/register
@@ -24,7 +38,7 @@ Content-Type: application/json
 
 {
   "username": "alice",
-  "password": "password123"
+  "password": "hunter1234"
 }
 ```
 
@@ -32,23 +46,17 @@ Content-Type: application/json
 ```json
 {
   "user_id": "uuid-here",
-  "username": "alice",
-  "message": "User registered successfully"
+  "username": "alice"
 }
 ```
 
-**Error** (409 Conflict)
-```json
-{
-  "error": "Username already exists"
-}
-```
+**Errors**
+- `400 Bad Request` — username/password fails validation
+- `409 Conflict` — username already taken
 
 ---
 
 ### Login
-
-Authenticate and receive an access token.
 
 ```http
 POST /api/auth/login
@@ -56,9 +64,43 @@ Content-Type: application/json
 
 {
   "username": "alice",
-  "password": "password123"
+  "password": "hunter1234"
 }
 ```
+
+**Response** (200 OK)
+```json
+{
+  "user_id": "uuid-here",
+  "username": "alice",
+  "token": "a3f9...64-hex-chars...2b1c",
+  "expires_in_seconds": 86400
+}
+```
+
+**Error** (401 Unauthorized)
+```json
+{ "error": "Invalid credentials" }
+```
+
+---
+
+### Logout
+
+Invalidates the current session token immediately.
+
+```http
+POST /api/auth/logout
+Authorization: Bearer <token>
+```
+
+**Response** (200 OK)
+```json
+{ "message": "Logged out" }
+```
+
+---
+
 
 **Response** (200 OK)
 ```json
@@ -295,19 +337,19 @@ curl http://localhost:8080/api/pets \
 
 ## Security Notes
 
-- Passwords are hashed before storage (using simple hash for demo; use bcrypt/argon2 in production)
-- Tokens are currently user_id (simple for demo; **use JWT or session tokens in production**)
+- Passwords are hashed with **SHA-256** and a **random per-user salt** (32 hex chars)
+- Session tokens are **64-character cryptographically random hex strings** — not derived from or equal to user_id
+- Tokens expire after **24 hours** and are immediately invalidated on logout
 - Each user can only access their own pets
 - All pet operations verify ownership before proceeding
 
-**⚠️ Production Security Recommendations:**
-- Replace simple password hashing with bcrypt, argon2, or similar
-- Implement proper JWT tokens with expiration times
-- Add rate limiting for authentication endpoints
+**⚠️ Remaining Production Recommendations:**
+- Upgrade password hashing to bcrypt or argon2id for resistance against brute-force
+- Add rate limiting on `/api/auth/login` and `/api/auth/register`
 - Use HTTPS/TLS for all communications
-- Add refresh token mechanism
-- Implement account lockout after failed login attempts
-- Consider adding email verification for registration
+- Add refresh token mechanism for long-lived sessions
+- Implement account lockout after repeated failed login attempts
+- Add email verification for new registrations
 
 ---
 

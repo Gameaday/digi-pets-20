@@ -1,18 +1,14 @@
-version: '3.8'
-
 services:
   digipets-server:
     build: .
     ports:
       - "8080:8080"
     volumes:
-      - ./data:/app/data
-    environment:
-      - PORT=8080
+      - digipets-data:/app/data
+    working_dir: /app/data
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+    # HEALTHCHECK is already defined in the Dockerfile
+
+volumes:
+  digipets-data:
+    driver: local
