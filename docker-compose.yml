@@ -1,0 +1,14 @@
+services:
+  digipets-server:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - digipets-data:/app/data
+    working_dir: /app/data
+    restart: unless-stopped
+    # HEALTHCHECK is already defined in the Dockerfile
+
+volumes:
+  digipets-data:
+    driver: local
